@@ -19,8 +19,6 @@ import os
 from django.core.cache import cache
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
-from .models import OptimizeTask
-import threading
 SM_MS_API_URL = "https://sm.ms/api/v2/upload"
 SM_MS_TOKEN = os.environ.get('SM_MS_TOKEN', 'IFBldSrcoBITPadg7v6HSJfw3RekT6Am')
 # 新增简单用户类
@@ -250,50 +248,59 @@ class ResumePhotoUploadAPIView(APIView):
 class OptimizeResumeView(ResumeBaseView):
     """使用DeepSeek大模型API优化简历（英语）"""
 
-    def post(self, request):
-        # 1. 创建任务
-        task = OptimizeTask.objects.create(status='pending')
-        doc_ref = self.get_user_resume_doc()
-        resume_data = self.get_resume_data(doc_ref)
-        prompt = self._create_english_optimization_prompt(resume_data)
-
-        # 2. 启动后台线程处理任务
-        threading.Thread(target=self._process_task, args=(task.id, prompt)).start()
-
-        return Response({'task_id': task.id})
-
-    def get(self, request, task_id):
-        # 查询任务状态和结果
-        try:
-            task = OptimizeTask.objects.get(id=task_id)
-        except OptimizeTask.DoesNotExist:
-            return Response({'error': 'Task not found'}, status=404)
-        return Response({
-            'status': task.status,
-            'result': task.result,
-            'error': task.error,
-        })
-
-    def _process_task(self, task_id, prompt):
-        task = OptimizeTask.objects.get(id=task_id)
-        task.status = 'processing'
-        task.save()
-        try:
-            # 这里调用你的大模型API
-            optimized_content = self._call_deepseek_api(prompt)
-            # 自动提取和解析 JSON
-            parsed_resume = self._parse_optimized_resume(optimized_content, None)
-            # 存储为字符串，方便前端直接 JSON.parse
-            task.result = json.dumps(parsed_resume, ensure_ascii=False)
-            task.status = 'done'
-        except Exception as e:
-            task.status = 'failed'
-            task.error = str(e)
-        task.save()
-
     # DeepSeek API配置
     DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-3f843c1b731642809c76190689ba9892")
     DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+
+    def post(self, request):
+        try:
+            # 1. 获取用户简历数据
+            doc_ref = self.get_user_resume_doc()
+            resume_data = self.get_resume_data(doc_ref)
+
+            if not resume_data:
+                return Response({'error': 'Resume data not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            # 2. 准备英语优化提示词
+            prompt = self._create_english_optimization_prompt(resume_data)
+
+            # 3. 调用DeepSeek API进行优化
+            optimized_content = self._call_deepseek_api(prompt)
+
+            # 4. 解析优化结果
+            optimized_resume = self._parse_optimized_resume(optimized_content, resume_data)
+
+            # 5. 验证优化后的数据
+            serializer = ResumeSerializer(data=optimized_resume)
+            if not serializer.is_valid():
+                return Response({
+                    'error': 'Optimized resume format is invalid',
+                    'details': serializer.errors
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            # 6. 返回优化后的简历给前端
+            return Response({
+                'status': 'success',
+                'message': 'Resume optimized successfully',
+                'data': serializer.validated_data
+            })
+
+        except requests.exceptions.RequestException as e:
+            return Response({
+                'error': f'Failed to connect to DeepSeek API: {str(e)}'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except FirebaseError as e:
+            return Response({
+                'error': f'Database error: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except ValueError as e:
+            return Response({
+                'error': f'Failed to parse optimized resume: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({
+                'error': f'Internal server error: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def _create_english_optimization_prompt(self, resume_data):
         """创建英语优化提示词"""
