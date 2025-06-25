@@ -2,7 +2,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 if not firebase_admin._apps:
-    cred = credentials.Certificate("./jobfind-53c9b-firebase-adminsdk-fbsvc-e6bb9f2f45.json")
+    cred = credentials.Certificate("/etc/secrets/jobfind-53c9b-firebase-adminsdk-fbsvc-e6bb9f2f45.json")
     firebase_app = firebase_admin.initialize_app(cred)
 else:
     firebase_app = firebase_admin.get_app()
