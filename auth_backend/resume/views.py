@@ -275,14 +275,16 @@ class OptimizeResumeView(ResumeBaseView):
         })
 
     def _process_task(self, task_id, prompt):
-        # 后台线程处理优化
         task = OptimizeTask.objects.get(id=task_id)
         task.status = 'processing'
         task.save()
         try:
             # 这里调用你的大模型API
             optimized_content = self._call_deepseek_api(prompt)
-            task.result = optimized_content
+            # 自动提取和解析 JSON
+            parsed_resume = self._parse_optimized_resume(optimized_content, None)
+            # 存储为字符串，方便前端直接 JSON.parse
+            task.result = json.dumps(parsed_resume, ensure_ascii=False)
             task.status = 'done'
         except Exception as e:
             task.status = 'failed'
