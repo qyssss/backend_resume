@@ -289,6 +289,10 @@ class OptimizeResumeView(ResumeBaseView):
             task.error = str(e)
         task.save()
 
+    # DeepSeek API配置
+    DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-3f843c1b731642809c76190689ba9892")
+    DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+
     def _create_english_optimization_prompt(self, resume_data):
         """创建英语优化提示词"""
         # 提取简历各部分内容
