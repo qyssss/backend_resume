@@ -247,7 +247,7 @@ class ResumePhotoUploadAPIView(APIView):
 
 
 # 新增简历优化接口（英语版）
-class OptimizeResumeView(APIView):
+class OptimizeResumeView(ResumeBaseView):
     """使用DeepSeek大模型API优化简历（英语）"""
 
     def post(self, request):
