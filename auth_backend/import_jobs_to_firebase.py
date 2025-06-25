@@ -12,7 +12,7 @@ def detect_encoding(file_path):
 
 def import_jobs_from_csv(csv_file_path):
     # 初始化Firebase应用
-    cred = credentials.Certificate("jobfind-53c9b-firebase-adminsdk-fbsvc-70e81f3842.json")
+    cred = credentials.Certificate("/etc/secrets/jobfind-53c9b-firebase-adminsdk-fbsvc-e6bb9f2f45.json")
     firebase_admin.initialize_app(cred)
     db = firestore.client()
 
