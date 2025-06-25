@@ -253,7 +253,9 @@ class OptimizeResumeView(APIView):
     def post(self, request):
         # 1. 创建任务
         task = OptimizeTask.objects.create(status='pending')
-        prompt = request.data.get('prompt', '')
+        doc_ref = self.get_user_resume_doc()
+        resume_data = self.get_resume_data(doc_ref)
+        prompt = self._create_english_optimization_prompt(resume_data)
 
         # 2. 启动后台线程处理任务
         threading.Thread(target=self._process_task, args=(task.id, prompt)).start()
@@ -286,10 +288,6 @@ class OptimizeResumeView(APIView):
             task.status = 'failed'
             task.error = str(e)
         task.save()
-
-    # DeepSeek API配置
-    DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-3f843c1b731642809c76190689ba9892")
-    DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
     def _create_english_optimization_prompt(self, resume_data):
         """创建英语优化提示词"""
